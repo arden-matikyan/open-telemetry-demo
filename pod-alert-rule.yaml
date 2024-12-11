@@ -1,0 +1,12 @@
+groups:
+  - name: pod-restart-alerts
+    rules:
+      - alert: PodRestartHigh
+        expr: increase(kube_pod_container_status_restarts_total[5m]) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Pod restart alert in namespace {{ $labels.namespace }}"
+          description: "The pod {{ $labels.pod }} in namespace {{ $labels.namespace }} has restarted more than once in the last 5 minutes."
+

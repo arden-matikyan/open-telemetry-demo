@@ -1,0 +1,94 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Amazon EKS Managed Node Group Setup with Enhanced Features
+
+Parameters:
+  ClusterName:
+    Description: The name of the EKS Cluster to associate the node group with.
+    Type: String
+  DesiredCapacity:
+    Default: 2
+    Description: Desired number of worker nodes.
+    Type: Number
+  MaxSize:
+    Default: 4
+    Description: Maximum number of worker nodes.
+    Type: Number
+  MinSize:
+    Default: 2
+    Description: Minimum number of worker nodes.
+    Type: Number
+  NodeGroupName:
+    Default: otel-node-group
+    Description: The name of the EKS Node Group.
+    Type: String
+  NodeInstanceType:
+    Default: t3.large
+    Description: The EC2 instance type for the worker nodes.
+    Type: String
+  PublicSubnets:
+    Description: A list of public subnet IDs where the node group instances will run.
+    Type: CommaDelimitedList
+  KeyName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: The name of an existing KeyPair to enable SSH access.
+    Default: project
+  NodeSecurityGroupId:
+    Description: The security group ID for worker nodes.
+    Type: String
+
+Resources:
+  NodeInstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - sts:AssumeRole
+            Principal:
+              Service: ec2.amazonaws.com
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy
+        - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly
+        - arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy
+      Tags:
+        - Key: Name
+          Value: eks-worker-node-role
+
+  NodeInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref NodeInstanceRole
+
+  NodeGroup:
+    Type: AWS::EKS::Nodegroup
+    Properties:
+      ClusterName: !Ref ClusterName
+      NodeRole: !GetAtt NodeInstanceRole.Arn
+      Subnets: !Ref PublicSubnets
+      ScalingConfig:
+        MinSize: !Ref MinSize
+        MaxSize: !Ref MaxSize
+        DesiredSize: !Ref DesiredCapacity
+      InstanceTypes:
+        - !Ref NodeInstanceType
+      AmiType: AL2_x86_64
+      RemoteAccess:
+        Ec2SshKey: !Ref KeyName
+        SourceSecurityGroups:
+          - !Ref NodeSecurityGroupId
+      Tags:
+        Project: otel-demo
+        Environment: production
+
+Outputs:
+  NodeGroupName:
+    Description: Name of the Node Group
+    Value: !Ref NodeGroup
+
+  NodeRoleArn:
+    Description: ARN of the IAM Role for Worker Nodes
+    Value: !GetAtt NodeInstanceRole.Arn
+
